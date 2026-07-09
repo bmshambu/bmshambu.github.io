@@ -1,18 +1,581 @@
-<!DOCTYPE html>
-<html lang="en" dir="ltr">
-  <head>
-    <meta charset="utf-8">
-    <meta name="viewport" content="width=device-width">
-    <title></title>
-  </head>
-  <body>
-    Hello from Shambu
-  </body>
-  <!-- Add script tag here -->
-  <script src="https://cdn.cai.tools.sap/webchat/webchat.js"
-	  channelId="80b2aa31-f1d4-40c9-b6be-a66f10685d65"
-	  token="343e5c4d7d6b7c55e3145e48cd9a0edb"
-	  id="cai-webchat"
-  ></script>
-  
-</html>
+<title>RFP GraphRAG — Cosmos Storage Migration (Option A)</title>
+<style>
+  :root {
+    --paper: #F6F8F9;
+    --card: #FFFFFF;
+    --ink: #182530;
+    --ink-soft: #46586622;
+    --muted: #5A6B77;
+    --line: #D8E0E4;
+    --accent: #0E8FA3;
+    --accent-soft: #0E8FA314;
+    --keep: #3E8E5A;
+    --keep-soft: #3E8E5A16;
+    --risk: #B97A24;
+    --risk-soft: #B97A2416;
+    --drop: #B0523C;
+    --drop-soft: #B0523C14;
+    --mono: ui-monospace, "Cascadia Code", Consolas, Menlo, monospace;
+    --sans: "Segoe UI", system-ui, -apple-system, sans-serif;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --paper: #0E161D;
+      --card: #15202A;
+      --ink: #E4ECF1;
+      --ink-soft: #9FB4C122;
+      --muted: #8FA3B0;
+      --line: #263542;
+      --accent: #35B3C7;
+      --accent-soft: #35B3C71A;
+      --keep: #5FB784;
+      --keep-soft: #5FB7841A;
+      --risk: #D99A47;
+      --risk-soft: #D99A471A;
+      --drop: #CE7961;
+      --drop-soft: #CE79611A;
+    }
+  }
+  :root[data-theme="dark"] {
+    --paper: #0E161D; --card: #15202A; --ink: #E4ECF1; --ink-soft: #9FB4C122;
+    --muted: #8FA3B0; --line: #263542; --accent: #35B3C7; --accent-soft: #35B3C71A;
+    --keep: #5FB784; --keep-soft: #5FB7841A; --risk: #D99A47; --risk-soft: #D99A471A;
+    --drop: #CE7961; --drop-soft: #CE79611A;
+  }
+  :root[data-theme="light"] {
+    --paper: #F6F8F9; --card: #FFFFFF; --ink: #182530; --ink-soft: #46586622;
+    --muted: #5A6B77; --line: #D8E0E4; --accent: #0E8FA3; --accent-soft: #0E8FA314;
+    --keep: #3E8E5A; --keep-soft: #3E8E5A16; --risk: #B97A24; --risk-soft: #B97A2416;
+    --drop: #B0523C; --drop-soft: #B0523C14;
+  }
+
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    background: var(--paper);
+    color: var(--ink);
+    font-family: var(--sans);
+    font-size: 15.5px;
+    line-height: 1.6;
+  }
+  .wrap { max-width: 960px; margin: 0 auto; padding: 48px 28px 80px; }
+
+  .eyebrow {
+    font-family: var(--mono);
+    font-size: 11.5px;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    color: var(--accent);
+    margin: 0 0 10px;
+  }
+  h1 {
+    font-size: clamp(26px, 4vw, 36px);
+    font-weight: 750;
+    letter-spacing: -0.02em;
+    line-height: 1.15;
+    margin: 0 0 14px;
+    text-wrap: balance;
+  }
+  .lede { font-size: 17px; color: var(--muted); max-width: 62ch; margin: 0 0 20px; }
+  .meta-row { display: flex; gap: 10px; flex-wrap: wrap; margin-bottom: 8px; }
+  .meta-chip {
+    font-family: var(--mono); font-size: 11.5px;
+    padding: 4px 12px; border: 1px solid var(--line); border-radius: 999px;
+    color: var(--muted); background: var(--card);
+  }
+
+  section { margin-top: 52px; }
+  h2 {
+    font-size: 21px; font-weight: 700; letter-spacing: -0.01em;
+    margin: 0 0 6px; text-wrap: balance;
+  }
+  .sec-eyebrow {
+    font-family: var(--mono); font-size: 11px; letter-spacing: 0.14em;
+    text-transform: uppercase; color: var(--muted); margin: 0 0 6px;
+  }
+  .sec-note { color: var(--muted); max-width: 68ch; margin: 0 0 18px; }
+  p { max-width: 70ch; }
+
+  /* Verdict banner */
+  .verdict {
+    display: flex; gap: 16px; align-items: flex-start;
+    background: var(--accent-soft);
+    border: 1px solid color-mix(in srgb, var(--accent) 35%, transparent);
+    border-radius: 12px; padding: 18px 20px; margin-top: 28px;
+  }
+  .verdict-mark {
+    font-family: var(--mono); font-weight: 700; font-size: 13px;
+    color: var(--accent); border: 1.5px solid var(--accent); border-radius: 8px;
+    padding: 3px 10px; white-space: nowrap; margin-top: 2px;
+  }
+  .verdict p { margin: 0; max-width: none; }
+  .verdict strong { color: var(--accent); }
+
+  /* Tables */
+  .tbl-wrap { overflow-x: auto; border: 1px solid var(--line); border-radius: 12px; background: var(--card); }
+  table { border-collapse: collapse; width: 100%; font-size: 14px; }
+  th, td { text-align: left; padding: 11px 16px; border-bottom: 1px solid var(--line); vertical-align: top; }
+  tr:last-child td { border-bottom: none; }
+  th {
+    font-family: var(--mono); font-size: 11px; letter-spacing: 0.1em;
+    text-transform: uppercase; color: var(--muted); font-weight: 600;
+    background: color-mix(in srgb, var(--ink) 3%, var(--card));
+  }
+  td.num { font-family: var(--mono); font-variant-numeric: tabular-nums; font-size: 13px; white-space: nowrap; }
+  td .bad { color: var(--drop); font-weight: 600; }
+  td .good { color: var(--keep); font-weight: 600; }
+  code, .code {
+    font-family: var(--mono); font-size: 0.88em;
+    background: var(--ink-soft); border-radius: 5px; padding: 1.5px 6px;
+  }
+
+  /* Diagrams */
+  .diagram {
+    border: 1px solid var(--line); border-radius: 12px;
+    background: var(--card); padding: 20px; overflow-x: auto;
+  }
+  .diagram + .diagram { margin-top: 16px; }
+  .dg-title {
+    font-family: var(--mono); font-size: 11.5px; letter-spacing: 0.12em;
+    text-transform: uppercase; color: var(--muted); margin: 0 0 16px;
+    display: flex; justify-content: space-between; gap: 12px; flex-wrap: wrap;
+  }
+  .dg-flow { display: flex; flex-direction: column; gap: 0; min-width: 620px; }
+  .dg-row { display: flex; align-items: stretch; gap: 10px; }
+  .dg-arrow-v {
+    font-family: var(--mono); color: var(--muted); text-align: center;
+    line-height: 1; padding: 6px 0; font-size: 15px;
+  }
+  .node {
+    flex: 1; border: 1.5px solid var(--line); border-radius: 10px;
+    padding: 10px 14px; background: var(--paper); min-width: 0;
+  }
+  .node b { display: block; font-size: 13.5px; letter-spacing: -0.01em; }
+  .node span { display: block; font-family: var(--mono); font-size: 11px; color: var(--muted); margin-top: 3px; }
+  .node.keep { border-color: color-mix(in srgb, var(--keep) 55%, transparent); background: var(--keep-soft); }
+  .node.new  { border-color: color-mix(in srgb, var(--accent) 60%, transparent); background: var(--accent-soft); }
+  .node.drop {
+    border-color: color-mix(in srgb, var(--drop) 45%, transparent);
+    background: var(--drop-soft);
+  }
+  .node.drop b { text-decoration: line-through; text-decoration-thickness: 1px; color: var(--drop); }
+  .legend { display: flex; gap: 18px; flex-wrap: wrap; margin-top: 14px; font-size: 12.5px; color: var(--muted); }
+  .legend i {
+    display: inline-block; width: 11px; height: 11px; border-radius: 3px;
+    margin-right: 6px; vertical-align: -1px; border: 1.5px solid;
+  }
+  .legend .k i { background: var(--keep-soft); border-color: var(--keep); }
+  .legend .n i { background: var(--accent-soft); border-color: var(--accent); }
+  .legend .d i { background: var(--drop-soft); border-color: var(--drop); }
+
+  /* Cosmos container chips inside target diagram */
+  .chips { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 8px; }
+  .chip {
+    font-family: var(--mono); font-size: 11.5px;
+    border: 1px solid color-mix(in srgb, var(--accent) 45%, transparent);
+    color: var(--accent); background: var(--card);
+    padding: 3px 10px; border-radius: 999px; white-space: nowrap;
+  }
+
+  /* Options cards */
+  .opts { display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 14px; }
+  .opt {
+    border: 1px solid var(--line); border-radius: 12px; background: var(--card);
+    padding: 18px 18px 16px; display: flex; flex-direction: column; gap: 8px;
+  }
+  .opt.rec { border-color: color-mix(in srgb, var(--accent) 55%, transparent); box-shadow: 0 0 0 3px var(--accent-soft); }
+  .opt h3 { margin: 0; font-size: 15.5px; }
+  .opt .badges { display: flex; gap: 6px; flex-wrap: wrap; }
+  .badge {
+    font-family: var(--mono); font-size: 10.5px; letter-spacing: 0.06em;
+    padding: 2.5px 9px; border-radius: 999px; text-transform: uppercase;
+  }
+  .badge.low  { background: var(--keep-soft); color: var(--keep); }
+  .badge.med  { background: var(--risk-soft); color: var(--risk); }
+  .badge.high { background: var(--drop-soft); color: var(--drop); }
+  .badge.pick { background: var(--accent-soft); color: var(--accent); }
+  .opt p { margin: 0; font-size: 13.5px; color: var(--muted); max-width: none; }
+
+  /* Pros / cons */
+  .pc { display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 14px; }
+  .pc-col { border: 1px solid var(--line); border-radius: 12px; background: var(--card); padding: 4px 20px 14px; }
+  .pc-col h3 { font-size: 14px; margin: 14px 0 4px; }
+  .pc-col.pros h3 { color: var(--keep); }
+  .pc-col.cons h3 { color: var(--risk); }
+  .pc-col ul { margin: 6px 0 0; padding-left: 20px; }
+  .pc-col li { margin: 8px 0; font-size: 14px; }
+  .pc-col li b { font-weight: 650; }
+  .pc-col li .mit { color: var(--muted); font-size: 13px; }
+
+  /* Steps */
+  .steps { counter-reset: step; display: flex; flex-direction: column; gap: 0; }
+  .step { display: flex; gap: 16px; padding: 13px 4px; border-bottom: 1px solid var(--line); }
+  .step:last-child { border-bottom: none; }
+  .step::before {
+    counter-increment: step; content: counter(step);
+    font-family: var(--mono); font-size: 13px; font-weight: 700; color: var(--accent);
+    border: 1.5px solid color-mix(in srgb, var(--accent) 50%, transparent);
+    border-radius: 8px; width: 30px; height: 30px; flex: 0 0 30px;
+    display: flex; align-items: center; justify-content: center; margin-top: 2px;
+  }
+  .step b { display: block; font-size: 14.5px; }
+  .step span { color: var(--muted); font-size: 13.5px; }
+  .step .est { font-family: var(--mono); font-size: 12px; color: var(--accent); margin-left: auto; white-space: nowrap; padding-top: 4px; }
+
+  .unchanged { display: flex; gap: 8px; flex-wrap: wrap; }
+  .unchanged .chip { border-color: color-mix(in srgb, var(--keep) 45%, transparent); color: var(--keep); }
+
+  footer {
+    margin-top: 60px; padding-top: 20px; border-top: 1px solid var(--line);
+    font-size: 13px; color: var(--muted);
+  }
+  footer a { color: var(--accent); text-decoration: none; }
+  footer a:hover { text-decoration: underline; }
+  a:focus-visible, button:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+</style>
+
+<div class="wrap">
+  <header>
+    <p class="eyebrow">Architecture proposal · RFP GraphRAG</p>
+    <h1>Scale to 10,000 documents by adopting the Cosmos DB storage pattern</h1>
+    <p class="lede">
+      Borrow the persistence layer from Microsoft's CosmosAIGraph reference architecture —
+      without taking on its Java / SPARQL graph stack. The pipeline, UI, and LLM layer stay
+      exactly as they are today.
+    </p>
+    <div class="meta-row">
+      <span class="meta-chip">2026-07-09</span>
+      <span class="meta-chip">status: proposal</span>
+      <span class="meta-chip">effort: 3–5 days</span>
+      <span class="meta-chip">risk: low</span>
+    </div>
+    <div class="verdict">
+      <span class="verdict-mark">RECOMMENDED</span>
+      <p>
+        <strong>Option A — storage pattern only.</strong> Move persistence from JSON files to
+        Cosmos DB NoSQL containers with per-document upserts and targeted queries. This removes
+        every identified 10k-doc blocker while touching none of the extraction pipeline, graph
+        algorithms, or UI. Full CosmosAIGraph adoption (Java graph service, SPARQL, OWL ontology)
+        stays open as a later step — the document schema is deliberately shaped to feed its
+        triples-builder if we ever need it.
+      </p>
+    </div>
+  </header>
+
+  <section>
+    <p class="sec-eyebrow">Why now</p>
+    <h2>The file-based store breaks at 10,000 documents</h2>
+    <p class="sec-note">
+      Every figure below is measured from the current code and the 100-document corpus, then
+      projected linearly. These are structural limits, not tuning problems.
+    </p>
+    <div class="tbl-wrap">
+      <table>
+        <thead>
+          <tr><th>Bottleneck</th><th>At 100 docs</th><th>At 10,000 docs</th></tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td><code>entities.json</code> + <code>relationships.json</code> size</td>
+            <td class="num">542 KB</td>
+            <td class="num"><span class="bad">~50–80 MB each</span></td>
+          </tr>
+          <tr>
+            <td>Full-file rewrite after <em>every</em> extracted document</td>
+            <td class="num">fine</td>
+            <td class="num"><span class="bad">O(N²) — 100s of GB written per run</span></td>
+          </tr>
+          <tr>
+            <td>Retriever parses <em>everything</em> on <em>every</em> query</td>
+            <td class="num">~0.1 s</td>
+            <td class="num"><span class="bad">10–30 s per question</span></td>
+          </tr>
+          <tr>
+            <td>Linear chunk scan per query</td>
+            <td class="num">~5k chunks</td>
+            <td class="num"><span class="bad">~500k chunks</span></td>
+          </tr>
+          <tr>
+            <td>Financial table injected whole into the prompt</td>
+            <td class="num">~3K tokens</td>
+            <td class="num"><span class="bad">~300K tokens — exceeds context window</span></td>
+          </tr>
+          <tr>
+            <td>Louvain communities to summarise</td>
+            <td class="num">13–48</td>
+            <td class="num"><span class="bad">500–1,500 → thousands of LLM calls</span></td>
+          </tr>
+          <tr>
+            <td>In-memory job manager</td>
+            <td class="num">fine</td>
+            <td class="num"><span class="bad">lost on restart · breaks at &gt;1 replica</span></td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+  </section>
+
+  <section>
+    <p class="sec-eyebrow">Architecture</p>
+    <h2>Current vs. target</h2>
+    <p class="sec-note">
+      Only the persistence layer changes. Ingestion, extraction, graph algorithms, and the
+      three-tab UI are untouched — that is the entire risk-containment argument.
+    </p>
+
+    <div class="diagram">
+      <p class="dg-title"><span>Current — file-based</span><span>single replica only</span></p>
+      <div class="dg-flow">
+        <div class="dg-row">
+          <div class="node keep"><b>Azure Blob Storage</b><span>containers · folders · RFP docs</span></div>
+          <div class="node keep"><b>FastAPI + LangGraph pipeline</b><span>extract → entities → graph → summarise</span></div>
+          <div class="node keep"><b>Gemini / Azure OpenAI</b><span>extraction · summaries · query synthesis</span></div>
+        </div>
+        <div class="dg-arrow-v">↓ &nbsp;writes / reads (full-file, every doc, every query)</div>
+        <div class="dg-row">
+          <div class="node drop"><b>entities.json · relationships.json</b><span>rewritten whole after each doc</span></div>
+          <div class="node drop"><b>chunks/*.json · communities/*.md</b><span>scanned linearly per query</span></div>
+          <div class="node drop"><b>in-memory JobManager</b><span>lost on restart</span></div>
+        </div>
+      </div>
+    </div>
+
+    <div class="diagram">
+      <p class="dg-title"><span>Target — Cosmos DB storage pattern (Option A)</span><span>multi-replica safe</span></p>
+      <div class="dg-flow">
+        <div class="dg-row">
+          <div class="node keep"><b>Azure Blob Storage</b><span>unchanged — containers · folders · SAS links</span></div>
+          <div class="node keep"><b>FastAPI + LangGraph pipeline</b><span>unchanged — same nodes, new storage calls</span></div>
+          <div class="node keep"><b>Gemini / Azure OpenAI</b><span>unchanged</span></div>
+        </div>
+        <div class="dg-arrow-v">↓ &nbsp;per-document upserts · targeted queries (no full loads)</div>
+        <div class="dg-row">
+          <div class="node new">
+            <b>Azure Cosmos DB for NoSQL</b>
+            <span>system of record · serverless or autoscale RU</span>
+            <div class="chips">
+              <span class="chip">entities /type</span>
+              <span class="chip">relationships /source_doc</span>
+              <span class="chip">chunks /doc_id</span>
+              <span class="chip">communities /graph_id</span>
+              <span class="chip">jobs /id</span>
+            </div>
+          </div>
+          <div class="node keep">
+            <b>NetworkX + Louvain (in-process)</b>
+            <span>rebuilt on demand from Cosmos · ~60k nodes fits a 4 GB container</span>
+          </div>
+        </div>
+      </div>
+      <div class="legend">
+        <span class="k"><i></i>unchanged</span>
+        <span class="n"><i></i>new — Cosmos DB</span>
+        <span class="d"><i></i>removed — file store</span>
+      </div>
+    </div>
+  </section>
+
+  <section>
+    <p class="sec-eyebrow">Data design</p>
+    <h2>Five containers replace the file tree</h2>
+    <div class="tbl-wrap">
+      <table>
+        <thead>
+          <tr><th>Container</th><th>Replaces</th><th>Partition key</th><th>Unlocks</th></tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td><code>entities</code></td>
+            <td>entities.json</td>
+            <td class="num">/type</td>
+            <td>Typed queries — e.g. <code>WHERE c.type='financial_instrument' AND c.attributes.maximum_amount &gt; 2000000</code> properly fixes the budget-table token blowup</td>
+          </tr>
+          <tr>
+            <td><code>relationships</code></td>
+            <td>relationships.json</td>
+            <td class="num">/source_doc</td>
+            <td>Per-document purge for re-extraction becomes a partition delete</td>
+          </tr>
+          <tr>
+            <td><code>chunks</code></td>
+            <td>chunks/*.json</td>
+            <td class="num">/doc_id</td>
+            <td>DiskANN vector index later — hybrid search replaces keyword scoring (step 2, independent)</td>
+          </tr>
+          <tr>
+            <td><code>communities</code></td>
+            <td>community_map.json + communities/*.md</td>
+            <td class="num">/graph_id</td>
+            <td>Summary pointers survive graph rebuilds; ready for theme-partitioned graphs</td>
+          </tr>
+          <tr>
+            <td><code>jobs</code></td>
+            <td>in-memory JobManager</td>
+            <td class="num">/id</td>
+            <td>Jobs survive restarts · resume checkpoints for 10k-doc extraction runs · multi-replica safe</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+  </section>
+
+  <section>
+    <p class="sec-eyebrow">Options considered</p>
+    <h2>Why not full CosmosAIGraph adoption today</h2>
+    <div class="opts">
+      <div class="opt rec">
+        <div class="badges"><span class="badge pick">recommended</span><span class="badge low">risk: low</span><span class="badge low">3–5 days</span></div>
+        <h3>A · Storage pattern only</h3>
+        <p>Cosmos NoSQL containers, per-doc upserts, targeted queries. Keep NetworkX in-process.
+           Removes every 10k blocker. Pipeline, UI, LLM layer untouched.</p>
+      </div>
+      <div class="opt">
+        <div class="badges"><span class="badge high">risk: high</span><span class="badge high">4–6 weeks</span></div>
+        <h3>B · Full CosmosAIGraph</h3>
+        <p>Their two-service architecture: <b>Java</b> Apache Jena graph service, SPARQL over REST,
+           OWL ontology, NL→SPARQL prompts, OmniRAG routing. No community pipeline, no document
+           extraction — both stay custom on our side regardless.</p>
+      </div>
+      <div class="opt">
+        <div class="badges"><span class="badge med">staged</span><span class="badge low">A now · B optional later</span></div>
+        <h3>C · Staged path</h3>
+        <p>Do A with schemas shaped for CosmosAIGraph's triples-builder (typed entities, explicit
+           relationship docs — we already have exactly that). B needs no second data migration
+           if multi-hop SPARQL is ever justified.</p>
+      </div>
+    </div>
+    <p class="sec-note" style="margin-top:16px">
+      Microsoft's own framing: CosmosAIGraph is <em>"a reference implementation, not a framework."</em>
+      Its demo dataset is structured JSON (PyPI libraries) — it has no unstructured-document
+      extraction and no GraphRAG community concept. Those are the two things our product is.
+    </p>
+  </section>
+
+  <section>
+    <p class="sec-eyebrow">Trade-offs</p>
+    <h2>Option A — pros and cons</h2>
+    <div class="pc">
+      <div class="pc-col pros">
+        <h3>Pros</h3>
+        <ul>
+          <li><b>Kills the O(N²) write problem</b> — upserts per document instead of rewriting a growing file 10,000 times.</li>
+          <li><b>Query latency stays flat</b> — targeted Cosmos queries replace parse-everything-per-question; no more 10–30 s loads.</li>
+          <li><b>Numeric filters move to the database</b> — "budget over 2M" becomes a WHERE clause, not 300K tokens of prompt.</li>
+          <li><b>Jobs survive restarts</b> — checkpoint/resume for long 10k-doc extraction runs; safe beyond one replica.</li>
+          <li><b>Nothing user-visible changes</b> — same three tabs, same pipeline, same models; a storage-layer swap behind an interface we already have (<code>storage.py</code> precedent).</li>
+          <li><b>Future-proof both directions</b> — schema feeds CosmosAIGraph's triples-builder (option B) and carries a <code>graph_id</code> for theme-partitioned graphs.</li>
+          <li><b>Vector search is one step away</b> — DiskANN index on the chunks container upgrades retrieval without another migration.</li>
+        </ul>
+      </div>
+      <div class="pc-col cons">
+        <h3>Cons &amp; mitigations</h3>
+        <ul>
+          <li><b>New Azure dependency + cost.</b> <span class="mit">Serverless tier ≈ single-digit $/month at this scale; autoscale only if query volume grows.</span></li>
+          <li><b>Local development needs Cosmos.</b> <span class="mit">Cosmos DB emulator or a keep-files fallback behind the same storage interface (same pattern as FolderSource vs AzureBlobSource today).</span></li>
+          <li><b>Graph rebuild reads all entities once.</b> <span class="mit">One bulk read per rebuild (seconds), then cached in process — vs every query paying that cost today.</span></li>
+          <li><b>Doesn't add multi-hop SPARQL or intent routing.</b> <span class="mit">Deliberate — that's Option B's scope, unlocked later without re-migration via the staged path.</span></li>
+          <li><b>Community summarisation cost at 500+ communities is unsolved by storage alone.</b> <span class="mit">Pair with theme-partitioned graphs (see migration_strategy.md) — per-theme rebuilds re-summarise only what changed.</span></li>
+        </ul>
+      </div>
+    </div>
+  </section>
+
+  <section>
+    <p class="sec-eyebrow">De-risking</p>
+    <h2>What does not change</h2>
+    <div class="unchanged">
+      <span class="chip">Blob ingestion + folder selection</span>
+      <span class="chip">LLM entity extraction</span>
+      <span class="chip">NetworkX + Louvain</span>
+      <span class="chip">Community summariser</span>
+      <span class="chip">Query planner + retrieval logic</span>
+      <span class="chip">3-tab UI</span>
+      <span class="chip">Gemini / Azure OpenAI switch</span>
+      <span class="chip">Dockerfile + Container Apps deploy</span>
+    </div>
+  </section>
+
+  <section>
+    <p class="sec-eyebrow">Plan</p>
+    <h2>Migration in six steps</h2>
+    <div class="steps">
+      <div class="step"><div><b>Storage interface extraction</b><span>Wrap current file reads/writes behind a GraphStore interface — file backend keeps working throughout.</span></div><span class="est">0.5 d</span></div>
+      <div class="step"><div><b>Cosmos backend + containers</b><span>Provision account (serverless), create five containers, implement CosmosGraphStore with upserts.</span></div><span class="est">1 d</span></div>
+      <div class="step"><div><b>Pipeline write path</b><span>Extraction, graph build, and summariser write per-document/per-community instead of whole files.</span></div><span class="est">1 d</span></div>
+      <div class="step"><div><b>Retriever read path</b><span>Targeted queries: entity search, chunk fetch, community lookup, financial WHERE filters.</span></div><span class="est">1 d</span></div>
+      <div class="step"><div><b>Jobs container</b><span>Persist job state + logs; add resume checkpoint for long extraction runs.</span></div><span class="est">0.5 d</span></div>
+      <div class="step"><div><b>Backfill + verify</b><span>One-off script migrates existing JSON artefacts; run the 100-doc corpus end-to-end against Cosmos.</span></div><span class="est">0.5–1 d</span></div>
+    </div>
+  </section>
+
+  <section>
+    <p class="sec-eyebrow">Stage 2 — after the storage move</p>
+    <h2>Theme-partitioned graphs with a routing layer</h2>
+    <p class="sec-note">
+      Instead of one monolithic 10k-doc graph, build one knowledge graph per theme
+      (1k–5k docs each). The blob layout already encodes the boundaries —
+      <code>Oracle</code>, <code>SAP</code>, <code>Workday</code>, <code>Salesforce</code>,
+      <code>Audit-Private</code>, <code>Audit-Public</code> — so partitioning is natural,
+      not invented. The Cosmos schema above carries a <code>graph_id</code> field for
+      exactly this reason: stage 2 needs no second migration.
+    </p>
+
+    <div class="diagram">
+      <p class="dg-title"><span>Query routing across theme graphs</span><span>fan-out, not single-choice</span></p>
+      <div class="dg-flow">
+        <div class="dg-row">
+          <div class="node keep"><b>User question</b><span>"compare indicative budgets across Oracle and Workday"</span></div>
+        </div>
+        <div class="dg-arrow-v">↓ &nbsp;1 · entity index lookup (deterministic) · 2 · planner + theme contexts · 3 · manual picker fallback</div>
+        <div class="dg-row">
+          <div class="node new"><b>Router</b><span>extends the existing query-planner call · returns target themes + decomposed per-theme sub-questions</span>
+            <div class="chips">
+              <span class="chip">theme-context.md ×N</span>
+              <span class="chip">global entity index</span>
+              <span class="chip">UI theme picker</span>
+            </div>
+          </div>
+        </div>
+        <div class="dg-arrow-v">↓ &nbsp;parallel retrieval per selected graph</div>
+        <div class="dg-row">
+          <div class="node keep"><b>Oracle graph</b><span>~1–5k docs · own communities</span></div>
+          <div class="node keep"><b>Workday graph</b><span>~1–5k docs · own communities</span></div>
+          <div class="node keep"><b>Audit-Private graph</b><span>restricted — never auto-routed</span></div>
+        </div>
+        <div class="dg-arrow-v">↓ &nbsp;≤3 graphs: one merged-context synthesis · wider: map-reduce (mini-answer per graph → merge)</div>
+        <div class="dg-row">
+          <div class="node keep"><b>Single cited answer</b><span>with a pill showing which graph(s) answered — same transparency pattern as "Interpreted as"</span></div>
+        </div>
+      </div>
+    </div>
+
+    <div class="pc" style="margin-top:16px">
+      <div class="pc-col pros">
+        <h3>Why partition by theme</h3>
+        <ul>
+          <li><b>Incremental everything</b> — new docs in one theme rebuild one small graph and re-summarise only its communities. Monolithic rebuilds reshuffle community IDs corpus-wide.</li>
+          <li><b>Scale pressure drops 10×</b> — 5–30k entities per graph keeps NetworkX + Louvain in-process and the visualisation renderable.</li>
+          <li><b>Retrieval precision</b> — budget questions about Oracle never wade through Workday entities; the financial table stays theme-sized.</li>
+          <li><b>Access control falls out free</b> — <code>Audit-Private</code> becomes a restricted graph, not a filtering problem.</li>
+          <li><b>Solves the community-count problem</b> — the one cost issue storage alone doesn't fix (500–1,500 communities to summarise).</li>
+        </ul>
+      </div>
+      <div class="pc-col cons">
+        <h3>Design guardrails</h3>
+        <ul>
+          <li><b>Route to N graphs, never "the one right graph".</b> <span class="mit">Cross-theme comparisons require fan-out with decomposed sub-questions, or they get worse than today.</span></li>
+          <li><b>theme-context.md is a table of contents, not a knowledge store.</b> <span class="mit">Auto-generated after each theme rebuild (from entity histograms + community titles), capped ~400 words, with a preserved human-edited block for routing hints ("Audit-Private — never auto-route"). If the router starts answering from it, answers bypass the graphs and lose citations.</span></li>
+          <li><b>Entity fragmentation needs the global entity index.</b> <span class="mit">"SAP S/4HANA" exists in four graphs; the index (entity → graphs, a few MB) restores name-based lookup and doubles as the router's free deterministic signal.</span></li>
+          <li><b>Contexts must state what's distinctive.</b> <span class="mit">Vague overlapping descriptions make the router select everything — the generation prompt forces "what can ONLY this theme answer?"</span></li>
+        </ul>
+      </div>
+    </div>
+  </section>
+
+  <footer>
+    Full research with sources: <code>migration_strategy.md</code> in the repo ·
+    References: <a href="https://github.com/AzureCosmosDB/CosmosAIGraph" rel="noopener">CosmosAIGraph</a> ·
+    <a href="https://learn.microsoft.com/en-us/azure/cosmos-db/gen-ai/cosmos-ai-graph" rel="noopener">Microsoft Learn — AI Knowledge Graphs</a>
+    · Prepared with the RFP GraphRAG team, July 2026
+  </footer>
+</div>
